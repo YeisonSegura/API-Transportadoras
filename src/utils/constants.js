@@ -7,7 +7,7 @@ const JERARQUIA_ESTADOS = {
   'entregado_transportadora': 5,
   'en_transito': 6,
   'entregado_cliente': 7,
-  'confirmado_qr': 8
+  'confirmado_qr': 8   // conservado por compatibilidad con pedidos históricos
 };
 
 // Tipos de notificaciones
@@ -16,7 +16,6 @@ const TIPOS_NOTIFICACION = {
   CAMBIO_ESTADO: 'cambio_estado',
   ENTREGA_TRANSPORTADORA: 'entrega_transportadora',
   ENTREGADO: 'entregado',
-  QR_CONFIRMADO: 'qr_confirmado',
   PEDIDO_PENDIENTE: 'pedido_pendiente'
 };
 
@@ -27,7 +26,7 @@ const ROLES = {
   ADMIN: 'admin'
 };
 
-// Estados de pedido
+// Estados de pedido activos (confirmado_qr solo existe por datos históricos)
 const ESTADOS_PEDIDO = {
   PENDIENTE: 'pendiente',
   RECIBIDO: 'recibido',
@@ -35,8 +34,7 @@ const ESTADOS_PEDIDO = {
   FACTURADO: 'facturado',
   ENTREGADO_TRANSPORTADORA: 'entregado_transportadora',
   EN_TRANSITO: 'en_transito',
-  ENTREGADO_CLIENTE: 'entregado_cliente',
-  CONFIRMADO_QR: 'confirmado_qr'
+  ENTREGADO_CLIENTE: 'entregado_cliente'
 };
 
 // Origen de cambio de estado

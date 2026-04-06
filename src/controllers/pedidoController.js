@@ -3,7 +3,6 @@ const { ROLES, TIPOS_NOTIFICACION, ESTADOS_PEDIDO } = require('../utils/constant
 const { validarCambioEstado } = require('../middlewares/validator');
 const {
   generarNumeroPedido,
-  generarCodigoQR,
   registrarEstado,
   obtenerDatosPedido
 } = require('../services/pedidoService');
@@ -95,7 +94,6 @@ async function crearPedido(req, res) {
       observaciones
     } = req.body;
 
-    // Validar permisos (solo vendedores y admins pueden crear pedidos)
     if (rol === ROLES.CLIENTE) {
       return res.status(403).json({ error: 'Los clientes no pueden crear pedidos directamente' });
     }
@@ -106,10 +104,8 @@ async function crearPedido(req, res) {
 
     await connection.beginTransaction();
 
-    // Generar número de pedido
     const numeroPedido = await generarNumeroPedido(connection);
 
-    // Insertar pedido
     const [result] = await connection.query(
       `INSERT INTO pedidos (
         numero_pedido, cliente_id, vendedor_id, ciudad_destino,
@@ -120,12 +116,10 @@ async function crearPedido(req, res) {
 
     const pedidoId = result.insertId;
 
-    // Crear notificación para el cliente
     const mensajeCliente = `Tu pedido ${numeroPedido} ha sido creado`;
     await crearNotificacion(connection, cliente_id, pedidoId, TIPOS_NOTIFICACION.PEDIDO_CREADO, 'Nuevo Pedido', mensajeCliente);
     await enviarNotificacionAUsuario(cliente_id, 'Nuevo Pedido', mensajeCliente, pedidoId);
 
-    // Notificar administradores
     const mensajeAdmin = `Pedido ${numeroPedido} requiere aprobación`;
     await notificarAdministradores(connection, pedidoId, TIPOS_NOTIFICACION.PEDIDO_PENDIENTE, 'Nuevo Pedido Pendiente', mensajeAdmin);
 
@@ -158,7 +152,6 @@ async function actualizarEstadoPedido(req, res) {
     const { rol } = req.user;
     const { nuevo_estado, descripcion, ubicacion, numero_guia, transportadora_id, link_factura } = req.body;
 
-    // Solo admin y vendedores pueden cambiar estados
     if (rol === ROLES.CLIENTE) {
       return res.status(403).json({ error: 'Los clientes no pueden cambiar estados' });
     }
@@ -169,7 +162,6 @@ async function actualizarEstadoPedido(req, res) {
 
     await connection.beginTransaction();
 
-    // Obtener estado actual del pedido
     const [pedidos] = await connection.query(
       'SELECT estado_actual, numero_guia FROM pedidos WHERE id = ?',
       [req.params.id]
@@ -182,41 +174,31 @@ async function actualizarEstadoPedido(req, res) {
 
     const estadoActual = pedidos[0].estado_actual;
 
-    // Validar que no se retroceda el estado
     const validacion = validarCambioEstado(estadoActual, nuevo_estado);
     if (!validacion.valido) {
       await connection.rollback();
       return res.status(400).json({ error: validacion.mensaje });
     }
 
-    // Preparar datos para actualizar
     let updateFields = { estado_actual: nuevo_estado };
     let updateParams = [nuevo_estado];
 
-    // Si se está entregando a transportadora, guardar guía y generar QR
+    // Si se entrega a transportadora, guardar guía (ya no se genera QR)
     if (nuevo_estado === ESTADOS_PEDIDO.ENTREGADO_TRANSPORTADORA) {
       if (!numero_guia || !transportadora_id) {
         await connection.rollback();
         return res.status(400).json({ error: 'Número de guía y transportadora requeridos para este estado' });
       }
-
       updateFields.numero_guia = numero_guia;
       updateFields.transportadora_id = transportadora_id;
       updateParams.push(numero_guia, transportadora_id);
-
-      // Generar código QR
-      const codigoQR = await generarCodigoQR(connection, req.params.id);
-      updateFields.codigo_qr = codigoQR;
-      updateParams.push(codigoQR);
     }
 
-    // Si se está facturando, guardar link de factura
     if (nuevo_estado === ESTADOS_PEDIDO.FACTURADO && link_factura) {
       updateFields.link_factura = link_factura;
       updateParams.push(link_factura);
     }
 
-    // Construir query de actualización
     const setClause = Object.keys(updateFields).map(key => `${key} = ?`).join(', ');
     updateParams.push(req.params.id);
 
@@ -225,19 +207,16 @@ async function actualizarEstadoPedido(req, res) {
       updateParams
     );
 
-    // Registrar en historial de estados
     await registrarEstado(connection, req.params.id, nuevo_estado, descripcion, ubicacion, req.user.id, 'manual');
 
-    // Obtener datos del pedido para notificaciones
     const [pedidoData] = await connection.query(
       'SELECT cliente_id, vendedor_id, numero_pedido FROM pedidos WHERE id = ?',
       [req.params.id]
     );
 
-    // Crear notificación para el cliente
     let mensajeNotif = `Tu pedido ${pedidoData[0].numero_pedido} cambió a: ${nuevo_estado}`;
     if (nuevo_estado === ESTADOS_PEDIDO.ENTREGADO_TRANSPORTADORA) {
-      mensajeNotif += ` - Guía: ${numero_guia} - QR: ${updateFields.codigo_qr || ''}`;
+      mensajeNotif += ` - Guía: ${numero_guia}`;
     }
 
     await crearNotificacion(connection, pedidoData[0].cliente_id, req.params.id, TIPOS_NOTIFICACION.CAMBIO_ESTADO, 'Actualización de Pedido', mensajeNotif);
@@ -248,8 +227,7 @@ async function actualizarEstadoPedido(req, res) {
     res.json({
       success: true,
       message: 'Estado actualizado exitosamente',
-      nuevo_estado,
-      codigo_qr: updateFields.codigo_qr || null
+      nuevo_estado
     });
   } catch (error) {
     await connection.rollback();
