@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 
-// Importar todas las rutas
 const authRoutes = require('./authRoutes');
 const usuarioRoutes = require('./usuarioRoutes');
 const pedidoRoutes = require('./pedidoRoutes');
@@ -12,7 +11,6 @@ const transportadoraRoutes = require('./transportadoraRoutes');
 const configuracionRoutes = require('./configuracionRoutes');
 const estadoPedidoRoutes = require('./estadoPedidoRoutes');
 
-// Montar las rutas
 router.use('/auth', authRoutes);
 router.use('/usuarios', usuarioRoutes);
 router.use('/pedidos', pedidoRoutes);

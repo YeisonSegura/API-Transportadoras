@@ -6,9 +6,9 @@ const {
   crearUsuario,
   actualizarUsuario,
   eliminarUsuario,
-  obtenerClientesVendedor,
+  obtenerClientesBodeguero,
   actualizarTokenFCM,
-  listarVendedores
+  listarBodegueros
 } = require('../controllers/usuarioController');
 const { authenticateToken, requireAdmin } = require('../middlewares/auth');
 const { validateRequired } = require('../middlewares/validator');
@@ -16,11 +16,11 @@ const { validateRequired } = require('../middlewares/validator');
 // GET /api/usuarios - Listar todos los usuarios (admin)
 router.get('/', authenticateToken, requireAdmin, listarUsuarios);
 
-// GET /api/usuarios/vendedores/lista - Listar vendedores
-router.get('/vendedores/lista', authenticateToken, listarVendedores);
+// GET /api/usuarios/bodegueros/lista - Listar bodegueros
+router.get('/bodegueros/lista', authenticateToken, listarBodegueros);
 
-// GET /api/usuarios/vendedores/:id/clientes - Clientes de un vendedor
-router.get('/vendedores/:id/clientes', authenticateToken, obtenerClientesVendedor);
+// GET /api/usuarios/bodegueros/:id/clientes - Clientes de un bodeguero
+router.get('/bodegueros/:id/clientes', authenticateToken, obtenerClientesBodeguero);
 
 // GET /api/usuarios/:id - Obtener usuario por ID
 router.get('/:id', authenticateToken, obtenerUsuario);

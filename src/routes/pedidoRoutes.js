@@ -4,9 +4,11 @@ const {
   obtenerPedidos,
   obtenerPedidoPorId,
   crearPedido,
-  actualizarEstadoPedido
+  actualizarEstadoPedido,
+  asignarNumeroGuia,
+  confirmarEntrega
 } = require('../controllers/pedidoController');
-const { authenticateToken, requireVendedorOrAdmin } = require('../middlewares/auth');
+const { authenticateToken, requireBodegueroOrAdmin } = require('../middlewares/auth');
 const { validateRequired, validateEstado } = require('../middlewares/validator');
 
 // GET /api/pedidos
@@ -18,7 +20,7 @@ router.get('/:id', authenticateToken, obtenerPedidoPorId);
 // POST /api/pedidos
 router.post('/',
   authenticateToken,
-  requireVendedorOrAdmin,
+  requireBodegueroOrAdmin,
   validateRequired(['cliente_id', 'ciudad_destino', 'direccion_entrega']),
   crearPedido
 );
@@ -26,10 +28,24 @@ router.post('/',
 // PUT /api/pedidos/:id/estado
 router.put('/:id/estado',
   authenticateToken,
-  requireVendedorOrAdmin,
+  requireBodegueroOrAdmin,
   validateRequired(['nuevo_estado']),
   validateEstado,
   actualizarEstadoPedido
+);
+
+// PUT /api/pedidos/:id/guia — Asignar número de guía (solo bodeguero y admin)
+router.put('/:id/guia',
+  authenticateToken,
+  requireBodegueroOrAdmin,
+  validateRequired(['numero_guia', 'transportadora_id']),
+  asignarNumeroGuia
+);
+
+// PUT /api/pedidos/:id/confirmar-entrega — Cliente confirma recepción
+router.put('/:id/confirmar-entrega',
+  authenticateToken,
+  confirmarEntrega
 );
 
 module.exports = router;

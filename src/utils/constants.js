@@ -6,8 +6,7 @@ const JERARQUIA_ESTADOS = {
   'facturado': 4,
   'entregado_transportadora': 5,
   'en_transito': 6,
-  'entregado_cliente': 7,
-  'confirmado_qr': 8   // conservado por compatibilidad con pedidos históricos
+  'entregado_cliente': 7
 };
 
 // Tipos de notificaciones
@@ -16,17 +15,18 @@ const TIPOS_NOTIFICACION = {
   CAMBIO_ESTADO: 'cambio_estado',
   ENTREGA_TRANSPORTADORA: 'entrega_transportadora',
   ENTREGADO: 'entregado',
-  PEDIDO_PENDIENTE: 'pedido_pendiente'
+  PEDIDO_PENDIENTE: 'pedido_pendiente',
+  PEDIDO_CONFIRMADO: 'pedido_confirmado'
 };
 
 // Roles de usuario
 const ROLES = {
   CLIENTE: 'cliente',
-  VENDEDOR: 'vendedor',
+  BODEGUERO: 'bodeguero',
   ADMIN: 'admin'
 };
 
-// Estados de pedido activos (confirmado_qr solo existe por datos históricos)
+// Estados de pedido activos
 const ESTADOS_PEDIDO = {
   PENDIENTE: 'pendiente',
   RECIBIDO: 'recibido',

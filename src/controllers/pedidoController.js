@@ -24,8 +24,8 @@ async function obtenerPedidos(req, res) {
     if (rol === ROLES.ADMIN) {
       query = 'SELECT * FROM vista_pedidos_completos ORDER BY fecha_creacion DESC';
       params = [];
-    } else if (rol === ROLES.VENDEDOR) {
-      query = 'SELECT * FROM vista_pedidos_completos WHERE vendedor_id = ? ORDER BY fecha_creacion DESC';
+    } else if (rol === ROLES.BODEGUERO) {
+      query = 'SELECT * FROM vista_pedidos_completos WHERE bodeguero_id = ? ORDER BY fecha_creacion DESC';
       params = [id];
     } else {
       query = 'SELECT * FROM vista_pedidos_completos WHERE cliente_id = ? ORDER BY fecha_creacion DESC';
@@ -61,7 +61,7 @@ async function obtenerPedidoPorId(req, res) {
     if (rol === ROLES.CLIENTE && pedido.cliente_id !== userId) {
       return res.status(403).json({ error: 'No tienes permiso para ver este pedido' });
     }
-    if (rol === ROLES.VENDEDOR && pedido.vendedor_id !== userId) {
+    if (rol === ROLES.BODEGUERO && pedido.bodeguero_id !== userId) {
       return res.status(403).json({ error: 'No tienes permiso para ver este pedido' });
     }
 
@@ -79,7 +79,7 @@ async function obtenerPedidoPorId(req, res) {
 }
 
 /**
- * Crear nuevo pedido
+ * Crear nuevo pedido (solo bodeguero y admin)
  */
 async function crearPedido(req, res) {
   const connection = await pool.getConnection();
@@ -108,7 +108,7 @@ async function crearPedido(req, res) {
 
     const [result] = await connection.query(
       `INSERT INTO pedidos (
-        numero_pedido, cliente_id, vendedor_id, ciudad_destino,
+        numero_pedido, cliente_id, bodeguero_id, ciudad_destino,
         direccion_entrega, link_pedido, observaciones, estado_actual
       ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pendiente')`,
       [numeroPedido, cliente_id, userId, ciudad_destino, direccion_entrega, link_pedido, observaciones]
@@ -143,7 +143,7 @@ async function crearPedido(req, res) {
 }
 
 /**
- * Actualizar estado de pedido
+ * Actualizar estado de pedido (solo bodeguero y admin)
  */
 async function actualizarEstadoPedido(req, res) {
   const connection = await pool.getConnection();
@@ -183,7 +183,7 @@ async function actualizarEstadoPedido(req, res) {
     let updateFields = { estado_actual: nuevo_estado };
     let updateParams = [nuevo_estado];
 
-    // Si se entrega a transportadora, guardar guía (ya no se genera QR)
+    // Si se entrega a transportadora, el bodeguero asigna el número de guía
     if (nuevo_estado === ESTADOS_PEDIDO.ENTREGADO_TRANSPORTADORA) {
       if (!numero_guia || !transportadora_id) {
         await connection.rollback();
@@ -210,7 +210,7 @@ async function actualizarEstadoPedido(req, res) {
     await registrarEstado(connection, req.params.id, nuevo_estado, descripcion, ubicacion, req.user.id, 'manual');
 
     const [pedidoData] = await connection.query(
-      'SELECT cliente_id, vendedor_id, numero_pedido FROM pedidos WHERE id = ?',
+      'SELECT cliente_id, bodeguero_id, numero_pedido FROM pedidos WHERE id = ?',
       [req.params.id]
     );
 
@@ -238,9 +238,135 @@ async function actualizarEstadoPedido(req, res) {
   }
 }
 
+/**
+ * Asignar número de guía a un pedido (solo bodeguero y admin)
+ */
+async function asignarNumeroGuia(req, res) {
+  const connection = await pool.getConnection();
+
+  try {
+    const { rol } = req.user;
+    const { numero_guia, transportadora_id } = req.body;
+
+    if (rol === ROLES.CLIENTE) {
+      return res.status(403).json({ error: 'Los clientes no pueden asignar números de guía' });
+    }
+
+    if (!numero_guia || !transportadora_id) {
+      return res.status(400).json({ error: 'Número de guía y transportadora son requeridos' });
+    }
+
+    await connection.beginTransaction();
+
+    const [pedidos] = await connection.query(
+      'SELECT id, estado_actual, cliente_id, numero_pedido FROM pedidos WHERE id = ?',
+      [req.params.id]
+    );
+
+    if (pedidos.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ error: 'Pedido no encontrado' });
+    }
+
+    await connection.query(
+      'UPDATE pedidos SET numero_guia = ?, transportadora_id = ? WHERE id = ?',
+      [numero_guia, transportadora_id, req.params.id]
+    );
+
+    const pedido = pedidos[0];
+    const mensaje = `Tu pedido ${pedido.numero_pedido} tiene número de guía asignado: ${numero_guia}`;
+    await crearNotificacion(connection, pedido.cliente_id, pedido.id, TIPOS_NOTIFICACION.CAMBIO_ESTADO, 'Guía Asignada', mensaje);
+    await enviarNotificacionAUsuario(pedido.cliente_id, 'Guía Asignada', mensaje, pedido.id);
+
+    await connection.commit();
+
+    res.json({
+      success: true,
+      message: 'Número de guía asignado exitosamente',
+      numero_guia,
+      transportadora_id
+    });
+  } catch (error) {
+    await connection.rollback();
+    console.error('Error al asignar número de guía:', error);
+    res.status(500).json({ error: 'Error al asignar número de guía', details: error.message });
+  } finally {
+    connection.release();
+  }
+}
+
+/**
+ * Confirmar entrega del pedido (solo el cliente del pedido)
+ */
+async function confirmarEntrega(req, res) {
+  const connection = await pool.getConnection();
+
+  try {
+    const { id: userId } = req.user;
+
+    await connection.beginTransaction();
+
+    const [pedidos] = await connection.query(
+      'SELECT id, cliente_id, bodeguero_id, numero_pedido, pedido_entregado FROM pedidos WHERE id = ?',
+      [req.params.id]
+    );
+
+    if (pedidos.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ error: 'Pedido no encontrado' });
+    }
+
+    const pedido = pedidos[0];
+
+    // Solo el cliente dueño del pedido puede confirmar
+    if (pedido.cliente_id !== userId) {
+      await connection.rollback();
+      return res.status(403).json({ error: 'Solo el cliente del pedido puede confirmar la entrega' });
+    }
+
+    if (pedido.pedido_entregado) {
+      await connection.rollback();
+      return res.status(400).json({ error: 'Este pedido ya fue confirmado como entregado' });
+    }
+
+    // Marcar como entregado y registrar fecha
+    await connection.query(
+      'UPDATE pedidos SET pedido_entregado = 1, fecha_confirmacion_entrega = NOW(), estado_actual = ? WHERE id = ?',
+      [ESTADOS_PEDIDO.ENTREGADO_CLIENTE, pedido.id]
+    );
+
+    await registrarEstado(connection, pedido.id, ESTADOS_PEDIDO.ENTREGADO_CLIENTE, 'Cliente confirmó recepción del pedido', null, userId, 'manual');
+
+    // Notificar al bodeguero y admin
+    const mensaje = `Cliente confirmó recepción del pedido ${pedido.numero_pedido}`;
+    await crearNotificacion(connection, pedido.bodeguero_id, pedido.id, TIPOS_NOTIFICACION.PEDIDO_CONFIRMADO, 'Entrega Confirmada', mensaje);
+    await enviarNotificacionAUsuario(pedido.bodeguero_id, 'Entrega Confirmada', mensaje, pedido.id);
+    await notificarAdministradores(connection, pedido.id, TIPOS_NOTIFICACION.PEDIDO_CONFIRMADO, 'Entrega Confirmada', mensaje);
+
+    await connection.commit();
+
+    res.json({
+      success: true,
+      message: 'Entrega confirmada exitosamente',
+      pedido: {
+        id: pedido.id,
+        numero_pedido: pedido.numero_pedido
+      }
+    });
+  } catch (error) {
+    await connection.rollback();
+    console.error('Error al confirmar entrega:', error);
+    res.status(500).json({ error: 'Error al confirmar entrega', details: error.message });
+  } finally {
+    connection.release();
+  }
+}
+
 module.exports = {
   obtenerPedidos,
   obtenerPedidoPorId,
   crearPedido,
-  actualizarEstadoPedido
+  actualizarEstadoPedido,
+  asignarNumeroGuia,
+  confirmarEntrega
 };

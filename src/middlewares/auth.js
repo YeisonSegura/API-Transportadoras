@@ -33,11 +33,11 @@ function requireAdmin(req, res, next) {
 }
 
 /**
- * Middleware para verificar que el usuario sea vendedor o admin
+ * Middleware para verificar que el usuario sea bodeguero o admin
  */
-function requireVendedorOrAdmin(req, res, next) {
-  if (req.user.rol !== ROLES.VENDEDOR && req.user.rol !== ROLES.ADMIN) {
-    return res.status(403).json({ error: 'Se requieren permisos de vendedor o administrador' });
+function requireBodegueroOrAdmin(req, res, next) {
+  if (req.user.rol !== ROLES.BODEGUERO && req.user.rol !== ROLES.ADMIN) {
+    return res.status(403).json({ error: 'Se requieren permisos de bodeguero o administrador' });
   }
   next();
 }
@@ -58,6 +58,6 @@ function requireOwnerOrAdmin(paramName = 'id') {
 module.exports = {
   authenticateToken,
   requireAdmin,
-  requireVendedorOrAdmin,
+  requireBodegueroOrAdmin,
   requireOwnerOrAdmin
 };
