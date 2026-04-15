@@ -13,7 +13,7 @@ async function obtenerHistorialPedido(req, res) {
 
     // Obtener datos del pedido para validar permisos
     const [pedidos] = await pool.query(
-      'SELECT cliente_id, vendedor_id FROM pedidos WHERE id = ?',
+      'SELECT cliente_id, bodeguero_id FROM pedidos WHERE id = ?',
       [pedidoId]
     );
 
@@ -27,7 +27,7 @@ async function obtenerHistorialPedido(req, res) {
     if (rol === ROLES.CLIENTE && pedido.cliente_id !== userId) {
       return res.status(403).json({ error: 'No tienes permiso para ver este historial' });
     }
-    if (rol === ROLES.VENDEDOR && pedido.vendedor_id !== userId) {
+    if (rol === ROLES.BODEGUERO && pedido.bodeguero_id !== userId) {
       return res.status(403).json({ error: 'No tienes permiso para ver este historial' });
     }
 
