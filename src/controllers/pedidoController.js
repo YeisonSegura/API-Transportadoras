@@ -17,16 +17,15 @@ const {
   rastrearGuiaCootransmagdalena
 } = require('../services/scrapingService');
 
-// Estados que el bodeguero puede asignar (solo avanzar entre estos dos)
+// Estados que el bodeguero puede asignar
 const ESTADOS_BODEGUERO = [
   ESTADOS_PEDIDO.EN_PROCESO,
-  ESTADOS_PEDIDO.ENTREGADO_TRANSPORTADORA
+  ESTADOS_PEDIDO.ENTREGADO_TRANSPORTADORA,
+  ESTADOS_PEDIDO.EN_TRANSITO
 ];
 
 // Estados que solo el admin puede modificar manualmente
-const ESTADOS_SOLO_ADMIN = [
-  ESTADOS_PEDIDO.EN_TRANSITO
-];
+const ESTADOS_SOLO_ADMIN = [];
 
 /**
  * Obtener todos los pedidos (con filtros por rol)
@@ -212,6 +211,7 @@ async function actualizarEstadoPedido(req, res) {
     }
 
     // Bodeguero solo puede gestionar sus propios pedidos
+    // y cuando el estado aún está en su rango de acción
     if (rol === ROLES.BODEGUERO && pedidos[0].bodeguero_id !== userId) {
       await connection.rollback();
       return res.status(403).json({ error: 'No tienes permiso para gestionar este pedido' });
