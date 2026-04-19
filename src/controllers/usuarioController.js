@@ -237,6 +237,68 @@ async function listarBodegueros(req, res) {
   }
 }
 
+/**
+ * Cambiar contraseña de un usuario
+ */
+async function cambiarPassword(req, res) {
+  try {
+    const { password_actual, password_nueva } = req.body;
+    const userId = req.params.id;
+
+    if (!password_actual || !password_nueva) {
+      return res.status(400).json({ error: 'Contraseña actual y nueva requeridas' });
+    }
+
+    if (password_nueva.length < 6) {
+      return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 6 caracteres' });
+    }
+
+    // Verificar que el usuario solo pueda cambiar su propia contraseña
+    if (req.user.id !== parseInt(userId)) {
+      return res.status(403).json({ error: 'No autorizado para cambiar la contraseña de otro usuario' });
+    }
+
+    // Obtener el usuario
+    const [usuarios] = await pool.query(
+      'SELECT id, password FROM usuarios WHERE id = ?',
+      [userId]
+    );
+
+    if (usuarios.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    const usuario = usuarios[0];
+
+    // Validar que la contraseña actual sea correcta
+    // Por ahora comparación directa (en desarrollo)
+    // TODO: En producción usar bcrypt.compare(password_actual, usuario.password)
+    if (password_actual !== usuario.password) {
+      return res.status(401).json({ error: 'La contraseña actual es incorrecta' });
+    }
+
+    // Validar que la nueva contraseña sea diferente
+    if (password_nueva === password_actual) {
+      return res.status(400).json({ error: 'La nueva contraseña debe ser diferente a la actual' });
+    }
+
+    // Actualizar la contraseña
+    // Por ahora guardar en texto plano (desarrollo)
+    // TODO: En producción usar: const hashedPassword = await bcrypt.hash(password_nueva, BCRYPT_SALT_ROUNDS);
+    await pool.query(
+      'UPDATE usuarios SET password = ? WHERE id = ?',
+      [password_nueva, userId]
+    );
+
+    console.log(`🔐 Contraseña cambiada para usuario ${userId}`);
+
+    res.json({ success: true, message: 'Contraseña cambiada exitosamente' });
+  } catch (error) {
+    console.error('Error al cambiar contraseña:', error);
+    res.status(500).json({ error: 'Error al cambiar contraseña', details: error.message });
+  }
+}
+
 module.exports = {
   listarUsuarios,
   obtenerUsuario,
@@ -245,5 +307,6 @@ module.exports = {
   eliminarUsuario,
   obtenerClientesBodeguero,
   actualizarTokenFCM,
-  listarBodegueros
+  listarBodegueros,
+  cambiarPassword
 };

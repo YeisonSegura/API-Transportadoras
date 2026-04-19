@@ -8,7 +8,8 @@ const {
   eliminarUsuario,
   obtenerClientesBodeguero,
   actualizarTokenFCM,
-  listarBodegueros
+  listarBodegueros,
+  cambiarPassword
 } = require('../controllers/usuarioController');
 const { authenticateToken, requireAdmin } = require('../middlewares/auth');
 const { validateRequired } = require('../middlewares/validator');
@@ -38,6 +39,9 @@ router.put('/:id', authenticateToken, actualizarUsuario);
 
 // PUT /api/usuarios/:id/fcm-token - Actualizar token FCM
 router.put('/:id/fcm-token', authenticateToken, actualizarTokenFCM);
+
+// PUT /api/usuarios/:id/cambiar-password - Cambiar contraseña
+router.put('/:id/cambiar-password', authenticateToken, cambiarPassword);
 
 // DELETE /api/usuarios/:id - Eliminar usuario (admin)
 router.delete('/:id', authenticateToken, requireAdmin, eliminarUsuario);
