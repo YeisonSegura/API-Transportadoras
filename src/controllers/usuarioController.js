@@ -102,7 +102,7 @@ async function actualizarTokenFCM(req, res) {
  */
 async function crearUsuario(req, res) {
   try {
-    const { nombre, email, username, password, rol, telefono, ciudad, direccion, bodeguero_asignado_id } = req.body;
+    const { nombre, email, username, password, rol, telefono, ciudad, direccion, bodeguero_asignado_id, numero_documento } = req.body;
 
     if (!nombre || !email || !username || !password || !rol) {
       return res.status(400).json({ error: 'Datos incompletos: nombre, email, username, password y rol son requeridos' });
@@ -122,21 +122,15 @@ async function crearUsuario(req, res) {
     }
 
     const [result] = await pool.query(
-      `INSERT INTO usuarios (nombre, email, username, password, rol, telefono, ciudad, direccion, bodeguero_asignado_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [nombre, email, username, password, rol, telefono, ciudad, direccion, bodeguero_asignado_id || null]
+      `INSERT INTO usuarios (nombre, email, username, password, rol, telefono, ciudad, direccion, bodeguero_asignado_id, numero_documento)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [nombre, email, username, password, rol, telefono || null, ciudad || null, direccion || null, bodeguero_asignado_id || null, numero_documento || null]
     );
 
     res.status(201).json({
       success: true,
       message: 'Usuario creado exitosamente',
-      usuario: {
-        id: result.insertId,
-        nombre,
-        email,
-        username,
-        rol
-      }
+      usuario: { id: result.insertId, nombre, email, username, rol }
     });
   } catch (error) {
     console.error('Error al crear usuario:', error);
@@ -149,7 +143,7 @@ async function crearUsuario(req, res) {
  */
 async function actualizarUsuario(req, res) {
   try {
-    const { nombre, email, telefono, ciudad, direccion, bodeguero_asignado_id, activo } = req.body;
+    const { nombre, email, telefono, ciudad, direccion, bodeguero_asignado_id, activo, numero_documento } = req.body;
     const userId = req.params.id;
 
     const [usuarios] = await pool.query('SELECT id FROM usuarios WHERE id = ?', [userId]);
@@ -175,6 +169,7 @@ async function actualizarUsuario(req, res) {
     if (telefono !== undefined) { updates.push('telefono = ?'); params.push(telefono); }
     if (ciudad !== undefined) { updates.push('ciudad = ?'); params.push(ciudad); }
     if (direccion !== undefined) { updates.push('direccion = ?'); params.push(direccion); }
+    if (numero_documento !== undefined) { updates.push('numero_documento = ?'); params.push(numero_documento); }
     if (bodeguero_asignado_id !== undefined) {
       updates.push('bodeguero_asignado_id = ?');
       params.push(bodeguero_asignado_id);
@@ -186,12 +181,7 @@ async function actualizarUsuario(req, res) {
     }
 
     params.push(userId);
-
-    await pool.query(
-      `UPDATE usuarios SET ${updates.join(', ')} WHERE id = ?`,
-      params
-    );
-
+    await pool.query(`UPDATE usuarios SET ${updates.join(', ')} WHERE id = ?`, params);
     res.json({ success: true, message: 'Usuario actualizado exitosamente' });
   } catch (error) {
     console.error('Error al actualizar usuario:', error);
