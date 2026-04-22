@@ -7,7 +7,7 @@ const { ROLES } = require('../utils/constants');
 async function listarUsuarios(req, res) {
   try {
     const { rol, activo } = req.query;
-    let query = 'SELECT id, nombre, email, username, rol, telefono, direccion, ciudad, bodeguero_asignado_id, activo, fecha_registro FROM usuarios WHERE 1=1';
+    let query = 'SELECT id, nombre, numero_documento, email, username, rol, telefono, direccion, ciudad, bodeguero_asignado_id, activo, fecha_registro FROM usuarios WHERE 1=1';
     const params = [];
 
     if (rol) {
@@ -36,7 +36,7 @@ async function listarUsuarios(req, res) {
 async function obtenerUsuario(req, res) {
   try {
     const [usuarios] = await pool.query(
-      'SELECT id, nombre, email, username, rol, telefono, direccion, ciudad, bodeguero_asignado_id, activo, fecha_registro FROM usuarios WHERE id = ?',
+      'SELECT id, nombre, numero_documento, email, username, rol, telefono, direccion, ciudad, bodeguero_asignado_id, activo, fecha_registro FROM usuarios WHERE id = ?',
       [req.params.id]
     );
 
