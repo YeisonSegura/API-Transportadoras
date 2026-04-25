@@ -23,3 +23,8 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+
+# Credenciales Firebase - NUNCA subir a GitHub
+apptransportadoras-firebase-adminsdk-fbsvc-9c4cfa1f95.json
+firebase-service-account.json
+*.json.key

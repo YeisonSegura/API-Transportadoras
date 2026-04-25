@@ -1,34 +1,46 @@
 const admin = require('firebase-admin');
-const fs = require('fs');
-const path = require('path');
-const { FIREBASE_SERVICE_ACCOUNT } = require('./env');
 
 let firebaseInitialized = false;
 
 function initializeFirebase() {
-  const serviceAccountPath = path.resolve(FIREBASE_SERVICE_ACCOUNT);
-
-  if (fs.existsSync(serviceAccountPath)) {
+  // Opción 1: desde variable de entorno (para producción en Render)
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
     try {
-      const serviceAccount = require(serviceAccountPath);
+      const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount)
       });
       firebaseInitialized = true;
-      console.log('✅ Firebase Admin SDK inicializado correctamente');
+      console.log('✅ Firebase Admin SDK inicializado desde variable de entorno');
       return true;
     } catch (error) {
-      console.error('❌ Error al inicializar Firebase Admin SDK:', error.message);
-      console.error('   Las notificaciones push NO funcionarán');
+      console.error('❌ Error al parsear FIREBASE_SERVICE_ACCOUNT_JSON:', error.message);
       return false;
     }
-  } else {
-    console.warn('⚠️ Archivo de cuenta de servicio de Firebase no encontrado');
-    console.warn(`   Buscado en: ${serviceAccountPath}`);
-    console.warn('   Las notificaciones push NO funcionarán');
-    console.warn('   Descarga el archivo desde Firebase Console y guárdalo como firebase-service-account.json');
-    return false;
   }
+
+  // Opción 2: desde archivo local (para desarrollo en tu computador)
+  const fs = require('fs');
+  const path = require('path');
+  const filePath = path.resolve('./apptransportadoras-firebase-adminsdk-fbsvc-9c4cfa1f95.json');
+  
+  if (fs.existsSync(filePath)) {
+    try {
+      const serviceAccount = require(filePath);
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount)
+      });
+      firebaseInitialized = true;
+      console.log('✅ Firebase Admin SDK inicializado desde archivo local');
+      return true;
+    } catch (error) {
+      console.error('❌ Error al inicializar Firebase:', error.message);
+      return false;
+    }
+  }
+
+  console.warn('⚠️ Firebase no configurado. Las notificaciones push NO funcionarán.');
+  return false;
 }
 
 function isFirebaseInitialized() {
@@ -39,8 +51,4 @@ function getFirebaseAdmin() {
   return admin;
 }
 
-module.exports = {
-  initializeFirebase,
-  isFirebaseInitialized,
-  getFirebaseAdmin
-};
+module.exports = { initializeFirebase, isFirebaseInitialized, getFirebaseAdmin };
