@@ -32,7 +32,7 @@ async function enviarNotificacionPush(fcmToken, titulo, mensaje, data = {}) {
         priority: 'high',
         notification: {
           sound: 'default',
-          channelId: 'default'
+          channelId: 'orders_channel'
         }
       },
       apns: {
