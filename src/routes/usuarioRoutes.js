@@ -11,11 +11,15 @@ const {
   listarBodegueros,
   cambiarPassword
 } = require('../controllers/usuarioController');
+const { getMe } = require('../controllers/authController');
 const { authenticateToken, requireAdmin } = require('../middlewares/auth');
 const { validateRequired } = require('../middlewares/validator');
 
 // GET /api/usuarios - Listar todos los usuarios (admin)
 router.get('/', authenticateToken, requireAdmin, listarUsuarios);
+
+// GET /api/usuarios/me - Obtener datos del usuario autenticado
+router.get('/me', authenticateToken, getMe);
 
 // GET /api/usuarios/bodegueros/lista - Listar bodegueros
 router.get('/bodegueros/lista', authenticateToken, listarBodegueros);

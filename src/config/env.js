@@ -18,7 +18,7 @@ module.exports = {
 
   // JWT
   JWT_SECRET: process.env.JWT_SECRET || 'bucaclinicos_secret_2025',
-  JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '7d',
+  JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '30d',
 
   // Seguridad
   BCRYPT_SALT_ROUNDS: parseInt(process.env.BCRYPT_SALT_ROUNDS) || 10,

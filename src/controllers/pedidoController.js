@@ -291,8 +291,8 @@ async function actualizarEstadoPedido(req, res) {
 
 /**
  * Intenta hacer scraping para verificar si la guía existe en la transportadora.
- * Si existe, cambia el estado a en_transito automáticamente.
- * Se ejecuta en background sin bloquear la respuesta.
+ * Solo registra un log con el resultado. NO cambia estados automáticamente
+ * para evitar notificaciones duplicadas.
  */
 async function _intentarScrapingAutomatico(pedidoId, numeroGuia, transportadoraId) {
   try {
@@ -312,26 +312,9 @@ async function _intentarScrapingAutomatico(pedidoId, numeroGuia, transportadoraI
     }
 
     if (resultado && resultado.success) {
-      // La guía existe — cambiar a en_transito automáticamente
-      const connection = await pool.getConnection();
-      try {
-        await connection.beginTransaction();
-        await connection.query(
-          "UPDATE pedidos SET estado_actual = 'en_transito' WHERE id = ?",
-          [pedidoId]
-        );
-        await registrarEstado(
-          connection, pedidoId, ESTADOS_PEDIDO.EN_TRANSITO,
-          'Guía verificada automáticamente en transportadora', null, null, 'automatico'
-        );
-        await connection.commit();
-        console.log(`✅ Pedido ${pedidoId} pasó a en_transito automáticamente`);
-      } catch (err) {
-        await connection.rollback();
-        console.error('Error al actualizar estado automático:', err);
-      } finally {
-        connection.release();
-      }
+      // La guía existe en la transportadora — solo log informativo
+      // El admin/bodeguero deberá cambiar a en_transito manualmente
+      console.log(`✅ Guía ${numeroGuia} verificada en ${trans[0].nombre} para pedido ${pedidoId}`);
     } else {
       console.log(`ℹ️ Guía ${numeroGuia} no encontrada en transportadora — el admin deberá marcar en_transito manualmente`);
     }
@@ -339,6 +322,7 @@ async function _intentarScrapingAutomatico(pedidoId, numeroGuia, transportadoraI
     console.error('Error en scraping automático:', err);
   }
 }
+
 
 /**
  * Asignar número de guía (solo bodeguero y admin)

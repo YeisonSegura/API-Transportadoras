@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { login, register } = require('../controllers/authController');
+const { login, register, refreshToken, getMe } = require('../controllers/authController');
 const { validateRequired, validateEmail } = require('../middlewares/validator');
 const { resetPassword } = require('../controllers/resetPasswordController');
+const { authenticateToken } = require('../middlewares/auth');
 
 // POST /api/auth/login
 router.post('/login', login);
@@ -13,6 +14,9 @@ router.post('/register',
   validateEmail,
   register
 );
+
+// POST /api/auth/refresh - Refrescar token JWT expirado
+router.post('/refresh', refreshToken);
 
 // POST /api/auth/reset-password
 router.post('/reset-password', resetPassword);
