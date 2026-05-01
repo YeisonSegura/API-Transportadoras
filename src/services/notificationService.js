@@ -5,8 +5,8 @@ const { pool } = require('../config/database');
  * Envía una notificación push mediante Firebase Cloud Messaging
  */
 async function enviarNotificacionPush(fcmToken, titulo, mensaje, data = {}) {
-  if (!fcmToken || fcmToken === null) {
-    console.log('⚠️ Token FCM no disponible, notificación no enviada');
+  if (!fcmToken || fcmToken === null || fcmToken === 'LOGGED_OUT') {
+    console.log('⚠️ Token FCM no disponible o sesión cerrada, notificación no enviada');
     return false;
   }
 
