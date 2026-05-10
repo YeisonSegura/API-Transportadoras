@@ -41,17 +41,14 @@ async function iniciarServidor() {
 ║      GET  /api/pedidos/:id                                 ║
 ║      POST /api/pedidos                                     ║
 ║      PUT  /api/pedidos/:id/estado                          ║
-║                                                            ║
-║   CÓDIGOS QR:                                              ║
-║      POST /api/qr/validar                                  ║
-║                                                            ║
+║                                                            ║                                              ║
 ║   NOTIFICACIONES:                                          ║
 ║      GET  /api/notificaciones/:usuario_id                  ║
 ║      PUT  /api/notificaciones/:id/leer                     ║
 ║                                                            ║
 ║   ESTADÍSTICAS:                                            ║
 ║      GET  /api/stats/admin                                 ║
-║      GET  /api/stats/vendedor/:id                          ║
+║      GET  /api/stats/bodeguero/:id                         ║
 ║                                                            ║
 ║   RASTREO:                                                 ║
 ║      POST /api/rastrear-guia                               ║

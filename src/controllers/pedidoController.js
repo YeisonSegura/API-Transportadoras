@@ -137,12 +137,12 @@ async function crearPedido(req, res) {
     await registrarEstado(connection, pedidoId, ESTADOS_PEDIDO.RECIBIDO, 'Pedido creado y recibido por administrador', null, userId, 'manual');
 
     // Notificar al cliente
-    const mensajeCliente = `Tu pedido ${numeroPedido} ha sido recibido y será gestionado pronto`;
+    const mensajeCliente = `Tu pedido #${pedidoId} ha sido recibido y será gestionado pronto`;
     await crearNotificacion(connection, cliente_id, pedidoId, TIPOS_NOTIFICACION.PEDIDO_CREADO, 'Pedido Recibido', mensajeCliente);
     await enviarNotificacionAUsuario(cliente_id, 'Pedido Recibido', mensajeCliente, pedidoId);
 
     // Notificar al bodeguero
-    const mensajeBodeguero = `Se te asignó el pedido ${numeroPedido} para gestionar`;
+    const mensajeBodeguero = `Se te asignó el pedido #${pedidoId} para gestionar`;
     await crearNotificacion(connection, bodeguero_id, pedidoId, TIPOS_NOTIFICACION.PEDIDO_CREADO, 'Nuevo Pedido Asignado', mensajeBodeguero);
     await enviarNotificacionAUsuario(bodeguero_id, 'Nuevo Pedido Asignado', mensajeBodeguero, pedidoId);
 
@@ -259,7 +259,7 @@ async function actualizarEstadoPedido(req, res) {
       [req.params.id]
     );
 
-    let mensajeNotif = `Tu pedido ${pedidoData[0].numero_pedido} cambió a: ${nuevo_estado}`;
+    let mensajeNotif = `Tu pedido #${req.params.id} cambió a: ${nuevo_estado}`;
     if (nuevo_estado === ESTADOS_PEDIDO.ENTREGADO_TRANSPORTADORA) {
       mensajeNotif += ` - Guía: ${numero_guia}`;
     }
@@ -367,7 +367,7 @@ async function asignarNumeroGuia(req, res) {
       [numero_guia, transportadora_id, req.params.id]
     );
 
-    const mensaje = `Tu pedido ${pedido.numero_pedido} tiene número de guía: ${numero_guia}`;
+    const mensaje = `Tu pedido #${pedido.id} tiene número de guía: ${numero_guia}`;
     await crearNotificacion(connection, pedido.cliente_id, pedido.id, TIPOS_NOTIFICACION.CAMBIO_ESTADO, 'Guía Asignada', mensaje);
     await enviarNotificacionAUsuario(pedido.cliente_id, 'Guía Asignada', mensaje, pedido.id);
 
@@ -437,7 +437,7 @@ async function confirmarEntrega(req, res) {
 
     await registrarEstado(connection, pedido.id, ESTADOS_PEDIDO.ENTREGADO_CLIENTE, 'Cliente confirmó recepción del pedido', null, userId, 'manual');
 
-    const mensaje = `Cliente confirmó recepción del pedido ${pedido.numero_pedido}`;
+    const mensaje = `Cliente confirmó recepción del pedido #${pedido.id}`;
     await crearNotificacion(connection, pedido.bodeguero_id, pedido.id, TIPOS_NOTIFICACION.PEDIDO_CONFIRMADO, 'Entrega Confirmada', mensaje);
     await enviarNotificacionAUsuario(pedido.bodeguero_id, 'Entrega Confirmada', mensaje, pedido.id);
     await notificarAdministradores(connection, pedido.id, TIPOS_NOTIFICACION.PEDIDO_CONFIRMADO, 'Entrega Confirmada', mensaje);
