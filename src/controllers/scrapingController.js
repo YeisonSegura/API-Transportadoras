@@ -41,6 +41,7 @@ async function rastrearGuia(req, res) {
         resultado = await rastrearGuiaCopetran(numeroGuia);
         break;
       
+      case 'trasmoralar':
       case 'transmoralar':
         resultado = await rastrearGuiaTransmoralar(numeroGuia);
         break;
