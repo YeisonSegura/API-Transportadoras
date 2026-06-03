@@ -121,28 +121,28 @@ async function rastrearGuiaTransmoralar(numeroGuia) {
     const guiaLimpia = numeroGuia.toString().trim();
     console.log(`🔍 Consultando guía Transmoralar: ${guiaLimpia}`);
 
-    const baseUrl = 'https://transmoralar.softwareparati.com';
-    const reportUrl = `${baseUrl}/reporte?nombre=ENC010&P_PEDIDO=${guiaLimpia}`;
-    
+    // ✅ Nueva URL de Transmoralar (la anterior softwareparati.com está caída)
+    const reportUrl = `https://transmoralar.com.co/Status/consulta-remesa.php?q=${guiaLimpia}`;
+
     console.log(`📡 Consultando URL: ${reportUrl}`);
-    
-    // Obtener el PDF como buffer
+
     const response = await axios.get(reportUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'application/pdf,text/html,*/*',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'es-CO,es;q=0.9,en;q=0.8',
+        'Referer': 'https://transmoralar.com.co/',
       },
-      responseType: 'arraybuffer',
       timeout: SCRAPING_TIMEOUT,
       maxRedirects: 5,
-      validateStatus: (status) => status >= 200 && status < 500
     });
 
     console.log(`✅ Respuesta recibida (${response.status})`);
 
-    if (!response.data || response.data.length < 100) {
-      console.log('⚠️ Contenido vacío o muy corto');
+    const htmlContent = response.data || '';
+
+    if (!htmlContent || htmlContent.length < 200) {
+      console.log('⚠️ Respuesta vacía o muy corta');
       return {
         success: false,
         error: 'No se encontraron datos para esta guía',
@@ -151,54 +151,13 @@ async function rastrearGuiaTransmoralar(numeroGuia) {
       };
     }
 
-    // Verificar si es un PDF
-    const buffer = Buffer.from(response.data);
-    const isPDF = buffer.toString('utf8', 0, 5) === '%PDF-';
-
-    console.log(`📄 Tipo de contenido: ${isPDF ? 'PDF' : 'Otro'}`);
-
-    let textContent = '';
-
-    if (isPDF) {
-      console.log('📖 Extrayendo texto del PDF...');
-      
-      try {
-        const pdfData = await pdfParse(buffer);
-        textContent = pdfData.text;
-        console.log(`✅ Texto extraído: ${textContent.length} caracteres`);
-      } catch (pdfError) {
-        console.error('❌ Error al parsear PDF:', pdfError);
-        return {
-          success: false,
-          error: 'Error al extraer información del PDF',
-          numeroGuia: guiaLimpia,
-          transportadora: 'transmoralar',
-          details: pdfError.message
-        };
-      }
-    } else {
-      // Si no es PDF, intentar como HTML
-      textContent = buffer.toString('utf8');
-    }
-
-    if (!textContent || textContent.length < 50) {
-      console.log('⚠️ Texto extraído vacío');
-      return {
-        success: false,
-        error: 'No se pudo extraer información del documento',
-        numeroGuia: guiaLimpia,
-        transportadora: 'transmoralar'
-      };
-    }
-
-    // Extraer TODOS los datos del texto
-    const datosCompletos = extraerDatosDesdeTextoTransmoralar(textContent, guiaLimpia);
+    // ✅ Extraer datos desde HTML con cheerio
+    const datosCompletos = extraerDatosDesdeHtmlTransmoralar(htmlContent, guiaLimpia);
 
     console.log('📊 Datos extraídos:', JSON.stringify(datosCompletos, null, 2));
 
-    // Verificar si tiene datos válidos
     if (!datosCompletos.estadoActual || datosCompletos.estadoActual === 'DESCONOCIDO') {
-      console.log('⚠️ No se encontraron datos válidos');
+      console.log('⚠️ No se encontraron datos válidos para la guía');
       return {
         success: false,
         error: 'No se encontraron datos para esta guía',
@@ -209,10 +168,10 @@ async function rastrearGuiaTransmoralar(numeroGuia) {
 
     return {
       success: true,
-      html: textContent,
+      html: htmlContent,
       numeroGuia: guiaLimpia,
       transportadora: 'transmoralar',
-      tipo: 'pdf',
+      tipo: 'html',
       url: reportUrl,
       datos: datosCompletos
     };
@@ -248,10 +207,136 @@ async function rastrearGuiaTransmoralar(numeroGuia) {
   }
 }
 
-/** */
+/**
+ * ✅ NUEVA: Extrae datos desde el HTML de la página de Transmoralar (scraping HTML)
+ * Estructura de la página:
+ *   - table.tabla-info-remesa  → filas con td.etiqueta-estado-guia/td.dato-estado-guia y td.dato
+ *   - table.tabla-rastreo-remesa → historial: Fecha | Hora | Ciudad | Estado | Causal
+ */
+function extraerDatosDesdeHtmlTransmoralar(html, numeroGuia) {
+  const datos = {
+    numeroGuia: numeroGuia,
+    remitente: { nombre: '', origen: '' },
+    destinatario: { nombre: '', destino: '', direccion: '', telefono: '' },
+    estadoActual: '',
+    estadoActualIcono: '',
+    estadoActualDescripcion: '',
+    historial: [],
+    fechaCreacion: '',
+    fechaEntrega: ''
+  };
+
+  try {
+    const $ = cheerio.load(html);
+
+    // ── 1. Tabla de información (tabla-info-remesa) ──
+    const tablaInfo = $('table.tabla-info-remesa');
+
+    tablaInfo.find('tr').each((_, fila) => {
+      const celdas = $(fila).find('td');
+      if (celdas.length < 3) return;
+
+      const etiqueta = $(celdas[0]).text().trim().toLowerCase();
+      const valor    = $(celdas[2]).text().trim();
+
+      if (!valor) return;
+
+      if (etiqueta.includes('estado')) {
+        datos.estadoActual = valor;
+      } else if (etiqueta.includes('remite')) {
+        datos.remitente.nombre = valor;
+      } else if (etiqueta.includes('ciudad origen') || etiqueta.includes('origen')) {
+        datos.remitente.origen = valor;
+      } else if (etiqueta.includes('destinatario')) {
+        datos.destinatario.nombre = valor;
+      } else if (etiqueta.includes('ciudad destino') || etiqueta.includes('destino')) {
+        datos.destinatario.destino = valor;
+      } else if (etiqueta.includes('dirección') || etiqueta.includes('direccion')) {
+        datos.destinatario.direccion = valor;
+      } else if (etiqueta.includes('teléfono') || etiqueta.includes('telefono')) {
+        datos.destinatario.telefono = valor;
+      } else if (etiqueta.includes('fecha envío') || etiqueta.includes('fecha envio')) {
+        datos.fechaCreacion = valor;
+      } else if (etiqueta.includes('fecha entrega')) {
+        datos.fechaEntrega = valor;
+      }
+    });
+
+    console.log(`✅ Estado extraído: "${datos.estadoActual}"`);
+
+    // ── 2. Tabla de historial (tabla-rastreo-remesa) ──
+    const tablaRastreo = $('table.tabla-rastreo-remesa');
+    const historialRaw = [];
+
+    tablaRastreo.find('tr').each((idx, fila) => {
+      if (idx === 0) return; // saltar encabezado
+      const celdas = $(fila).find('td');
+      if (celdas.length < 4) return;
+
+      const fecha  = $(celdas[0]).text().trim();
+      const hora   = $(celdas[1]).text().trim();
+      const ciudad = $(celdas[2]).text().trim();
+      const estado = $(celdas[3]).text().trim();
+      const causal = celdas.length >= 5 ? $(celdas[4]).text().trim() : '';
+
+      if (fecha && estado) {
+        historialRaw.push({
+          estado: estado.toUpperCase(),
+          fecha: `${fecha} ${hora}`.trim(),
+          ciudad,
+          causal,
+          detalles: causal && causal !== 'SIN NOVEDAD' ? causal : ciudad
+        });
+        console.log(`📝 Historial: ${estado} - ${fecha} ${hora} - ${ciudad}`);
+      }
+    });
+
+    datos.historial = historialRaw;
+
+    // ── 3. Normalizar estado actual ──
+    if (datos.estadoActual) {
+      datos.estadoActualIcono        = obtenerIconoEstadoTransmoralar(datos.estadoActual);
+      datos.estadoActualDescripcion  = datos.estadoActual;
+    }
+
+    // Fallback: si no se obtuvo estado desde la tabla info, usar el último del historial
+    if (!datos.estadoActual && historialRaw.length > 0) {
+      datos.estadoActual = historialRaw[historialRaw.length - 1].estado;
+      datos.estadoActualIcono = obtenerIconoEstadoTransmoralar(datos.estadoActual);
+    }
+
+    console.log('✅ Extracción HTML Transmoralar completada:', {
+      estado: datos.estadoActual,
+      historial: datos.historial.length,
+      remitente: datos.remitente.nombre,
+      destinatario: datos.destinatario.nombre
+    });
+
+  } catch (err) {
+    console.error('❌ Error extrayendo HTML Transmoralar:', err.message);
+    datos.estadoActual = 'DESCONOCIDO';
+  }
+
+  return datos;
+}
 
 /**
- * Extrae TODOS los datos del texto extraído del PDF de Transmoralar - CORREGIDO
+ * Ícono por estado para Transmoralar (nueva versión HTML)
+ */
+function obtenerIconoEstadoTransmoralar(estado) {
+  const e = (estado || '').toUpperCase();
+  if (e.includes('ENTREGAD')) return '✅';
+  if (e.includes('TRANSITO') || e.includes('TRÁNSITO') || e.includes('NACIONAL')) return '🚚';
+  if (e.includes('RUTA')) return '🚐';
+  if (e.includes('BODEGA')) return '📦';
+  if (e.includes('RECOGID')) return '📋';
+  return '📍';
+}
+
+// ── Funciones legacy conservadas para compatibilidad con exports ──
+
+/**
+ * @deprecated Usar extraerDatosDesdeHtmlTransmoralar en su lugar
  */
 function extraerDatosDesdeTextoTransmoralar(texto, numeroGuia) {
   const datos = {
@@ -500,6 +585,7 @@ function obtenerDescripcionEstado(estado) {
   
   return descripciones[estado] || estado;
 }
+
 /**
  * Agrega esta función DENTRO de tu scrapingService.js
  * ANTES de la función extraerDatosDesdeTextoTransmoralar
@@ -1079,13 +1165,18 @@ function obtenerDescripcionEstadoCootrans(estado) {
 module.exports = {
   rastrearGuiaCopetran,
   rastrearGuiaTransmoralar,
-  rastrearGuiaCootransmagdalena, // ✅ Nueva
+  rastrearGuiaCootransmagdalena,
+  // Transmoralar (nueva versión HTML)
+  extraerDatosDesdeHtmlTransmoralar,
+  obtenerIconoEstadoTransmoralar,
+  // Transmoralar (legacy PDF - mantenido por compatibilidad)
   organizarEstadosTransmoralar,
-  organizarEstadosCootransmagdalena, // ✅ Nueva
   obtenerIconoEstado,
   obtenerDescripcionEstado,
-  obtenerIconoEstadoCootrans, // ✅ Nueva
-  obtenerDescripcionEstadoCootrans, // ✅ Nueva
   extraerDatosDesdeTextoTransmoralar,
-  extraerDatosDesdeTextoCootransmagdalena // ✅ Nueva
+  // Cootransmagdalena
+  organizarEstadosCootransmagdalena,
+  obtenerIconoEstadoCootrans,
+  obtenerDescripcionEstadoCootrans,
+  extraerDatosDesdeTextoCootransmagdalena
 };
