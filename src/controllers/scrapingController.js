@@ -57,7 +57,9 @@ async function rastrearGuia(req, res) {
     }
 
     if (!resultado.success) {
-      return res.status(resultado.error.includes('no se encontraron') ? 404 : 500).json(resultado);
+      const errorMsg = (resultado.error || '').toString().toLowerCase();
+      const statusCode = errorMsg.includes('no se encontraron') || errorMsg.includes('no existe') ? 404 : 500;
+      return res.status(statusCode).json(resultado);
     }
 
     // Intentar actualizar en BD si el pedido existe
